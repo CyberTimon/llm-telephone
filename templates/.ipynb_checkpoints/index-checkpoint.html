@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio Recorder</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous"></script>
+</head>
+<style>
+    body {
+        background-color: #121212;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+    }
+    #recordButton {
+        background-color: #FF5722;
+        border: none;
+        color: white;
+        padding: 15px 32px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 50%;
+        width: 100px;
+        height: 100px;
+        outline: none;
+    }
+    #player {
+        display: none;
+    }
+</style>
+<body>
+    <button id="recordButton"><i class="fas fa-microphone"></i></button>
+    <audio id="player" controls></audio>
+
+    <script>
+        let chunks = [];
+        let recorder;
+        const recordButton = document.getElementById('recordButton');
+        const player = document.getElementById('player');
+
+        recordButton.onmousedown = function() {
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                recorder = new MediaRecorder(stream);
+                recorder.start();
+                recordButton.textContent = 'Recording...';
+                recorder.ondataavailable = e => chunks.push(e.data);
+            });
+        };
+
+        recordButton.onmouseup = function() {
+            if (recorder && recorder.state !== 'inactive') {
+                recorder.stop();
+                recordButton.innerHTML = '<i class="fas fa-microphone"></i>';
+                recorder.onstop = e => {
+                    const blob = new Blob(chunks, { type: 'audio/wav; codecs=pcm' });
+                    chunks = [];
+
+                    // Create a new FileReader object
+                    let reader = new FileReader();
+
+                    // Read the Blob as a data URL
+                    reader.readAsDataURL(blob);
+
+                    // Create an audio element to check the duration
+                    let audio = new Audio();
+                    audio.src = URL.createObjectURL(blob);
+                    audio.onloadedmetadata = function() {
+                        // Only send if the duration is longer than 2 seconds
+                        if (audio.duration > 2) {
+                            const formData = new FormData();
+                            formData.append('file', blob, 'audio.wav');
+                            fetch('/process_audio', { method: 'POST', body: formData })
+                                .then(response => response.json())
+                                .then(data => {
+                                    player.src = '/get_audio/' + data.message;
+                                    setTimeout(function(){
+                                        player.play();
+                                    }, 800);
+                                });
+                        }
+                    };
+                };
+            }
+        };
+    </script>
+</body>
+</html>
